@@ -1,6 +1,9 @@
 import requests
 import json
 from pathlib import Path
+import time
+from datetime import datetime
+
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,25 +12,46 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows your Next.js frontend to connect
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 VOLTHRESHOLD = 10000
-url = "https://prices.runescape.wiki/api/v2/osrs/latest"
 HEADERS = {"User-Agent": "osrs-ge-price-tracker"}
 MAPPING_FILE = Path("mapping.json")
+PRICES_FILE = Path("prices.json")
+CACHE_TTL = 300  #Check every 5 mins
+
+
 
 def wiki_call():
-    try:
-        response = requests.get(url, headers=HEADERS)
-        response.raise_for_status()
-        return response.json()["data"]
-    except requests.exceptions.RequestException as err:
-        print(f"An error occurred: {err}")
-        return {}
+  # Check if file exists and is less than 5 minutes old
+  if PRICES_FILE.exists():
+    file_age = time.time() - PRICES_FILE.stat().st_mtime
+    if file_age < CACHE_TTL:
+      with open(PRICES_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+  try:
+    url = "https://prices.runescape.wiki/api/v2/osrs/latest"
+    response = requests.get(url, headers=HEADERS)
+    response.raise_for_status()
+    data = response.json()["data"]
+
+    with open(PRICES_FILE, "w", encoding="utf-8") as f:
+      json.dump(data, f, indent=4)
+
+    return data
+
+  except requests.exceptions.RequestException as err:
+    print(f"An error occurred: {err}")
+    # Fallback to stale file if network/API call fails
+    if PRICES_FILE.exists():
+      with open(PRICES_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+    return {}
 
 def get_mapping():
     if MAPPING_FILE.exists():
@@ -57,8 +81,7 @@ def get_volume(potential_items, results, item_lookup):
     response = requests.get(vol_url, headers=HEADERS)
     response.raise_for_status()
     data = response.json()["data"]
-    
-    n = 0
+
     for item_id in data:
         item_info = data[item_id]
         high_volume = item_info.get("highPriceVolume", 0)
@@ -67,18 +90,29 @@ def get_volume(potential_items, results, item_lookup):
 
         if item_id in potential_items:
             if total_item_volume > VOLTHRESHOLD:
-                n += 1
                 name = item_lookup.get(int(item_id), "Unknown Item")
                 margin = potential_items[item_id][1]
                 buy_price = potential_items[item_id][2]
                 
                 results.append({
                     "name": name,
-                    "margin": margin,
-                    "volume": total_item_volume,
-                    "roi": (margin / buy_price) * 100,
-                    "ev": total_item_volume * margin
+                    "margin": margin,  # Raw profit spread in gp
+                    "volume": total_item_volume,  # 24h traded volume
+                    "roi": (margin / buy_price) * 100,  # Return on Investment percentage
+                    "ev": total_item_volume * margin,  # Volume-weighted profit potential
+                    "price": buy_price,  # Instant-sell low price (target buy-in)
                 })
+
+@app.get("/api/flips/last-updated")
+def get_last_updated():
+  if PRICES_FILE.exists():
+    mtime = PRICES_FILE.stat().st_mtime
+    readable_time = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+    return {"last_updated": readable_time, "timestamp": mtime}
+
+  return {"last_updated": "Never", "timestamp": None}
+
+
 
 @app.get("/api/flips/roi")
 def get_flips(

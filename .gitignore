@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .venv/
 backend/mapping.json
+backend/prices.json
