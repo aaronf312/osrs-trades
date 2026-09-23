@@ -12,14 +12,13 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows your Next.js frontend to connect
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 VOLTHRESHOLD = 10000
-url = "https://prices.runescape.wiki/api/v2/osrs/latest"
 HEADERS = {"User-Agent": "osrs-ge-price-tracker"}
 MAPPING_FILE = Path("mapping.json")
 PRICES_FILE = Path("prices.json")
@@ -82,8 +81,7 @@ def get_volume(potential_items, results, item_lookup):
     response = requests.get(vol_url, headers=HEADERS)
     response.raise_for_status()
     data = response.json()["data"]
-    
-    n = 0
+
     for item_id in data:
         item_info = data[item_id]
         high_volume = item_info.get("highPriceVolume", 0)
@@ -92,7 +90,6 @@ def get_volume(potential_items, results, item_lookup):
 
         if item_id in potential_items:
             if total_item_volume > VOLTHRESHOLD:
-                n += 1
                 name = item_lookup.get(int(item_id), "Unknown Item")
                 margin = potential_items[item_id][1]
                 buy_price = potential_items[item_id][2]
