@@ -17,13 +17,13 @@ export default function Home() {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   useEffect(() => {
-    const apiUrl = (import.meta.env as any).VITE_API_URL || 'http://localhost:8000';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || 'http://localhost:8000';
     fetch(`${apiUrl}/api/flips/roi?sort_by=${sortBy}`)
       .then((res) => res.json())
       .then((data) => setItems(data))
       .catch((err) => console.error('Fetch error:', err));
 
-    fetch('${apiUrl}/api/flips/last-updated')
+    fetch(`${apiUrl}/api/flips/last-updated`)
       .then((res) => res.json())
       .then((data) => setLastUpdated(data.last_updated))
       .catch((err) => console.error('Error fetching timestamp:', err));
