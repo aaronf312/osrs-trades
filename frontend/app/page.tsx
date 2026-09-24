@@ -17,7 +17,7 @@ export default function Home() {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || 'http://localhost:8000';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     fetch(`${apiUrl}/api/flips/roi?sort_by=${sortBy}`)
       .then((res) => res.json())
       .then((data) => setItems(data))
