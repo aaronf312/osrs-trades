@@ -1,3 +1,5 @@
+**Live Application:** [https://osrs-trades.pages.dev/](https://osrs-trades.pages.dev/)
+
 # osrs-trades
 
 OSRS Grand Exchange price tracker. A FastAPI backend screens the OSRS Wiki pricing API for high-margin flips, and a Next.js frontend displays them with ROI, margin, 24h volume, EV score, and recommended buy price.
