@@ -54,7 +54,16 @@ export default function Home() {
         <header style={styles.header}>
           <div>
             <h1 style={styles.title}>OSRS GE Screener</h1>
-            <p style={styles.subtitle}>High-margin Grand Exchange intelligence</p>
+            <p style={styles.subtitle}>
+              High-margin Grand Exchange intelligence • <a
+                href="https://github.com/aaronf312/osrs-trades"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#00ff00', textDecoration: 'none', marginLeft: '8px' }}
+              >
+                GitHub
+              </a>
+            </p>
           </div>
           <div style={styles.timestampBadge}>
             <span style={{
