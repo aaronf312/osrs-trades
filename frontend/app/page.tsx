@@ -10,23 +10,42 @@ interface FlipItem {
   price: number;
 }
 
+type ConnectionStatus = 'connecting' | 'connected' | 'error';
+
 export default function Home() {
   const [items, setItems] = useState<FlipItem[]>([]);
   const [sortBy, setSortBy] = useState<string>('roi');
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
+  const [status, setStatus] = useState<ConnectionStatus>('connecting');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    fetch(`${apiUrl}/api/flips/roi?sort_by=${sortBy}`)
-      .then((res) => res.json())
-      .then((data) => setItems(data))
-      .catch((err) => console.error('Fetch error:', err));
+    setStatus('connecting');
 
-    fetch(`${apiUrl}/api/flips/last-updated`)
-      .then((res) => res.json())
-      .then((data) => setLastUpdated(data.last_updated))
-      .catch((err) => console.error('Error fetching timestamp:', err));
+    Promise.all([
+      fetch(`${apiUrl}/api/flips/roi?sort_by=${sortBy}`).then((res) => {
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        return res.json();
+      }),
+      fetch(`${apiUrl}/api/flips/last-updated`).then((res) => {
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        return res.json();
+      })
+    ])
+      .then(([itemsData, timestampData]) => {
+        setItems(itemsData);
+        setLastUpdated(timestampData.last_updated);
+        setStatus('connected');
+        setErrorMessage('');
+      })
+      .catch((err) => {
+        console.error('Connection error:', err);
+        setStatus('error');
+        setErrorMessage(`Failed to connect to backend at ${apiUrl}. Make sure Uvicorn is running.`);
+      });
   }, [sortBy]);
 
   return (
@@ -38,10 +57,28 @@ export default function Home() {
             <p style={styles.subtitle}>High-margin Grand Exchange intelligence</p>
           </div>
           <div style={styles.timestampBadge}>
-            <span style={styles.pulseDot}></span>
-            <span>Synced: {lastUpdated || 'Loading...'}</span>
+            <span style={{
+              ...styles.pulseDot,
+              backgroundColor: status === 'connected' ? '#00ff00' : status === 'connecting' ? '#ffaa00' : '#ff3333',
+              boxShadow: status === 'connected'
+                ? '0 0 6px rgba(0, 255, 0, 0.6)'
+                : status === 'connecting'
+                  ? '0 0 6px rgba(255, 170, 0, 0.6)'
+                  : '0 0 6px rgba(255, 51, 51, 0.6)'
+            }}></span>
+            <span>
+              {status === 'connecting' && 'Waking up backend (Free tier sleep)...'}
+              {status === 'connected' && `Synced: ${lastUpdated || 'Active'}`}
+              {status === 'error' && 'Backend Offline'}
+            </span>
           </div>
         </header>
+
+        {status === 'error' && (
+          <div style={styles.errorBanner}>
+            <strong>Connection Warning:</strong> {errorMessage}
+          </div>
+        )}
 
         <div style={styles.toolbar}>
           <div style={styles.sortGroup}>
@@ -76,7 +113,6 @@ export default function Home() {
                     <span style={styles.tooltip}>Raw profit spread in gp</span>
                   )}
                 </th>
-
                 <th
                   style={styles.thRightWithTooltip}
                   onMouseEnter={() => setActiveTooltip('volume')}
@@ -87,7 +123,6 @@ export default function Home() {
                     <span style={styles.tooltip}>24h traded volume</span>
                   )}
                 </th>
-
                 <th
                   style={styles.thRightWithTooltip}
                   onMouseEnter={() => setActiveTooltip('roi')}
@@ -98,7 +133,6 @@ export default function Home() {
                     <span style={styles.tooltip}>Return on Investment percentage</span>
                   )}
                 </th>
-
                 <th
                   style={styles.thRightWithTooltip}
                   onMouseEnter={() => setActiveTooltip('ev')}
@@ -109,7 +143,6 @@ export default function Home() {
                     <span style={styles.tooltip}>Volume-weighted profit potential</span>
                   )}
                 </th>
-
                 <th
                   style={styles.thRightWithTooltip}
                   onMouseEnter={() => setActiveTooltip('price')}
@@ -126,7 +159,9 @@ export default function Home() {
               {items.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={styles.emptyRow}>
-                    Querying price engine...
+                    {status === 'connecting' && 'Waking up free-tier backend...'}
+                    {status === 'error' && 'No data available (Backend unreachable).'}
+                    {status === 'connected' && 'Querying price engine...'}
                   </td>
                 </tr>
               ) : (
@@ -152,8 +187,8 @@ export default function Home() {
 const styles = {
   main: {
     minHeight: '100vh',
-    backgroundColor: '#0d0b0a', // Deep charcoal/black void
-    color: '#ff981f', // Classic RuneScape gold/orange text primary
+    backgroundColor: '#0d0b0a',
+    color: '#ff981f',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     padding: '40px 20px',
   },
@@ -165,21 +200,21 @@ const styles = {
     display: 'flex' as const,
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: '32px',
-    borderBottom: '2px solid #2d251e', // Mahogany wood trim feel
+    marginBottom: '24px',
+    borderBottom: '2px solid #2d251e',
     paddingBottom: '20px',
   },
   title: {
     fontSize: '26px',
     fontWeight: 700,
     letterSpacing: '-0.5px',
-    color: '#ffc107', // Bright quest-log gold
+    color: '#ffc107',
     margin: '0 0 4px 0',
     textShadow: '1px 1px #000000',
   },
   subtitle: {
     fontSize: '13px',
-    color: '#b0a8a0', // Muted parchment gray
+    color: '#b0a8a0',
     margin: 0,
   },
   timestampBadge: {
@@ -189,16 +224,23 @@ const styles = {
     backgroundColor: '#16120e',
     border: '1px solid #3d3127',
     padding: '8px 14px',
-    borderRadius: '4px', // Sharp corners match classic RS inventory boxes
+    borderRadius: '4px',
     fontSize: '13px',
     color: '#d1c7bc',
   },
   pulseDot: {
     width: '8px',
     height: '8px',
-    backgroundColor: '#00ff00', // Classic status green
     borderRadius: '50%',
-    boxShadow: '0 0 6px rgba(0, 255, 0, 0.6)',
+  },
+  errorBanner: {
+    backgroundColor: '#3a1111',
+    border: '1px solid #ff3333',
+    color: '#ff9999',
+    padding: '12px 16px',
+    borderRadius: '4px',
+    fontSize: '13px',
+    marginBottom: '20px',
   },
   toolbar: {
     display: 'flex',
@@ -326,7 +368,7 @@ const styles = {
     padding: '16px 20px',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#ffc107', // Gold for gp values
+    color: '#ffc107',
     textAlign: 'right' as const,
     fontVariantNumeric: 'tabular-nums',
   },

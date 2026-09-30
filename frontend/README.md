@@ -1,5 +1,7 @@
 # osrs-trades frontend
 
+**Live Application:** [https://osrs-trades.pages.dev/](https://osrs-trades.pages.dev/)
+
 Next.js frontend for the OSRS Grand Exchange screener. It displays high-margin flips with ROI, margin, 24h volume, EV score, and recommended buy price.
 
 ## Getting Started
